@@ -1,0 +1,387 @@
+FIKAMA
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Scheduling Simulator</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Segoe UI',sans-serif;
+}
+
+body{
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    min-height:100vh;
+    color:white;
+    padding:20px;
+}
+
+.container{
+    max-width:1200px;
+    margin:auto;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:20px;
+    color:#38bdf8;
+}
+
+.card{
+    background:#1e293b;
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:20px;
+    box-shadow:0 0 15px rgba(0,0,0,0.3);
+}
+
+input,select{
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    margin:5px;
+}
+
+button{
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    background:#38bdf8;
+    color:black;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#0ea5e9;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:15px;
+}
+
+th,td{
+    border:1px solid #475569;
+    padding:10px;
+    text-align:center;
+}
+
+th{
+    background:#334155;
+}
+
+#gantt{
+    display:flex;
+    flex-wrap:wrap;
+    margin-top:20px;
+}
+
+.block{
+    padding:20px;
+    margin:2px;
+    background:#22c55e;
+    color:white;
+    text-align:center;
+    border-radius:5px;
+    min-width:70px;
+}
+
+.metrics{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:20px;
+}
+
+.metric-card{
+    background:#0f172a;
+    padding:20px;
+    border-radius:10px;
+    text-align:center;
+}
+
+h2{
+    margin-bottom:10px;
+    color:#38bdf8;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>CPU Scheduling Simulator</h1>
+
+<div class="card">
+<h2>Add Process</h2>
+
+<input type="text" id="pid" placeholder="Process ID">
+
+<input type="number" id="arrival" placeholder="Arrival Time">
+
+<input type="number" id="burst" placeholder="Burst Time">
+
+<input type="number" id="priority" placeholder="Priority">
+
+<button onclick="addProcess()">Add Process</button>
+
+<table>
+<thead>
+<tr>
+<th>PID</th>
+<th>Arrival</th>
+<th>Burst</th>
+<th>Priority</th>
+</tr>
+</thead>
+
+<tbody id="processTable"></tbody>
+
+</table>
+</div>
+
+<div class="card">
+
+<h2>Scheduling Options</h2>
+
+<select id="algorithm">
+<option value="fcfs">FCFS</option>
+<option value="sjf">SJF</option>
+<option value="priority">Priority</option>
+<option value="rr">Round Robin</option>
+</select>
+
+<input type="number" id="quantum" placeholder="Quantum (RR)" value="2">
+
+<button onclick="runScheduling()">Run Simulation</button>
+
+</div>
+
+<div class="card">
+<h2>Gantt Chart</h2>
+<div id="gantt"></div>
+</div>
+
+<div class="card">
+<h2>Results</h2>
+<div id="results"></div>
+</div>
+
+</div>
+
+<script>
+
+let processes=[];
+
+function addProcess(){
+
+let pid=document.getElementById("pid").value;
+let arrival=parseInt(document.getElementById("arrival").value);
+let burst=parseInt(document.getElementById("burst").value);
+let priority=parseInt(document.getElementById("priority").value);
+
+if(!pid || isNaN(arrival) || isNaN(burst) || isNaN(priority)){
+alert("Fill all fields");
+return;
+}
+
+processes.push({
+pid,
+arrival,
+burst,
+priority
+});
+
+displayProcesses();
+}
+
+function displayProcesses(){
+
+let table=document.getElementById("processTable");
+
+table.innerHTML="";
+
+processes.forEach(p=>{
+
+table.innerHTML+=`
+<tr>
+<td>${p.pid}</td>
+<td>${p.arrival}</td>
+<td>${p.burst}</td>
+<td>${p.priority}</td>
+</tr>
+`;
+
+});
+
+}
+
+function runScheduling(){
+
+let algo=document.getElementById("algorithm").value;
+
+let scheduled=[];
+
+if(algo==="fcfs"){
+
+scheduled=[...processes]
+.sort((a,b)=>a.arrival-b.arrival);
+
+}
+
+else if(algo==="sjf"){
+
+scheduled=[...processes]
+.sort((a,b)=>a.burst-b.burst);
+
+}
+
+else if(algo==="priority"){
+
+scheduled=[...processes]
+.sort((a,b)=>a.priority-b.priority);
+
+}
+
+else if(algo==="rr"){
+
+roundRobin();
+
+return;
+}
+
+drawGantt(scheduled);
+calculateMetrics(scheduled);
+
+}
+
+function roundRobin(){
+
+let quantum=parseInt(
+document.getElementById("quantum").value
+);
+
+let queue=processes.map(p=>({...p,remaining:p.burst}));
+
+let gantt=[];
+
+while(queue.some(p=>p.remaining>0)){
+
+for(let p of queue){
+
+if(p.remaining>0){
+
+let exec=Math.min(quantum,p.remaining);
+
+gantt.push({
+pid:p.pid,
+burst:exec
+});
+
+p.remaining-=exec;
+
+}
+
+}
+
+}
+
+drawGantt(gantt);
+
+document.getElementById("results").innerHTML=
+"<h2>Round Robin Simulation Completed</h2>";
+
+}
+
+function drawGantt(list){
+
+let gantt=document.getElementById("gantt");
+
+gantt.innerHTML="";
+
+list.forEach(p=>{
+
+let block=document.createElement("div");
+
+block.className="block";
+
+block.style.width=(p.burst*40)+"px";
+
+block.innerHTML=
+`${p.pid}<br>${p.burst}`;
+
+gantt.appendChild(block);
+
+});
+
+}
+
+function calculateMetrics(list){
+
+let time=0;
+
+let totalWT=0;
+let totalTAT=0;
+
+let html=`
+<table>
+<tr>
+<th>PID</th>
+<th>Waiting Time</th>
+<th>Turnaround Time</th>
+</tr>
+`;
+
+list.forEach(p=>{
+
+let wt=Math.max(0,time-p.arrival);
+
+let tat=wt+p.burst;
+
+totalWT+=wt;
+totalTAT+=tat;
+
+time+=p.burst;
+
+html+=`
+<tr>
+<td>${p.pid}</td>
+<td>${wt}</td>
+<td>${tat}</td>
+</tr>
+`;
+
+});
+
+html+=`</table>`;
+
+html+=`
+<div class="metrics">
+
+<div class="metric-card">
+<h2>Average Waiting Time</h2>
+<h1>${(totalWT/list.length).toFixed(2)}</h1>
+</div>
+
+<div class="metric-card">
+<h2>Average Turnaround Time</h2>
+<h1>${(totalTAT/list.length).toFixed(2)}</h1>
+</div>
+
+</div>
+`;
+
+document.getElementById("results").innerHTML=html;
+
+}
+
+</script>
+
+</body>
+</html>
